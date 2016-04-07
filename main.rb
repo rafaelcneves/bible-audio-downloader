@@ -2,7 +2,7 @@
 
 require 'nokogiri'
 require 'open-uri'
-require 'fileutils'
+# require 'fileutils'
 
 class Bible
   @base_url = "http://www.biblica.com"
@@ -11,36 +11,41 @@ class Bible
 
   def self.create_download_files
     next_url = @base_url + @first_url
-    Dir.mkdir(@urls_path) unless Dir.exist?(@urls_path)
-    urls_dir = Dir.new(@urls_path)
+    dirs = []
 
-    # while true
-    5.times do
+    while true
       body = Nokogiri::HTML(open(next_url))
       download_elem = body.css("audio > source[type='audio/mpeg']").first
-      # header_elem = body.css("h1").first
-
-      # puts header_elem.text
-      # folder = header_elem.text.gsub(/The\ Bible\: /, "").gsub(/\ \d*$/, "")
       folder = next_url.split("/")[-2]
 
-      filename = File.join(urls_dir, folder + ".txt")
+      print folder + " " if dirs.empty?
 
-      f = File.open(filename, "a")
-      f.puts download_elem["src"]
-      f.close
+      dirs << download_elem["src"]
+      print "#"
 
       next_elem = body.css(".next").first
       next_url = @base_url + next_elem["href"]
+      next_folder = next_url.split("/")[-2]
+
+      unless next_folder == folder
+        filename = File.join(@urls_path, folder)
+
+        File.open(filename, "w") do |file|
+          file.puts dirs
+        end
+
+        dirs = []
+        print "\n"
+      end
     end
   end
 
   def self.download_audios
     Dir[File.join(@urls_path, "*.txt")].each do |file|
-      `wget --directory-prefix='downloads/#{file.split('/').last.gsub('.txt', '')}' -i #{file}`
+      `wget --directory-prefix='downloads/#{file.split('/').last}' -i #{file}`
     end
   end
 end
 
 Bible.create_download_files
-Bible.download_audios
+# Bible.download_audios
