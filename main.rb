@@ -6,7 +6,7 @@ require 'fileutils'
 
 class Bible
   @base_url = "http://www.biblica.com"
-  @first_url = "/en-us/bible/online-bible/nvi-pt/ezequiel/1/"
+  @first_url = "/en-us/bible/online-bible/nvi-pt/genesis/1/"
 
   def self.create_download_files
     next_url = @base_url + @first_url
