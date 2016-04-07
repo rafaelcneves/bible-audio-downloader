@@ -41,7 +41,7 @@ class Bible
   end
 
   def self.download_audios
-    Dir[File.join(@urls_path, "*.txt")].each do |file|
+    Dir[File.join(@urls_path, "*")].each do |file|
       `wget --directory-prefix='downloads/#{file.split('/').last}' -i #{file}`
     end
   end
