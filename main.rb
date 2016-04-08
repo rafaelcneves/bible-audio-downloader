@@ -48,4 +48,4 @@ class Bible
 end
 
 Bible.create_download_files
-# Bible.download_audios
+Bible.download_audios
