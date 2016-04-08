@@ -6,37 +6,36 @@ require 'open-uri'
 
 class Bible
   @base_url = "http://www.biblica.com"
-  @first_url = "/en-us/bible/online-bible/nvi-pt/genesis/1/"
+  @first_href = "/en-us/bible/online-bible/nvi-pt/genesis/1/"
   @urls_path = "urls"
 
   def self.create_download_files
-    next_url = @base_url + @first_url
-    dirs = []
+    main_body = Nokogiri::HTML(open(@base_url + @first_href))
+    books = main_body.css(".bible-nav .large ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
 
-    while true
-      body = Nokogiri::HTML(open(next_url))
-      download_elem = body.css("audio > source[type='audio/mpeg']").first
-      folder = next_url.split("/")[-2]
+    [0..9, 10..19, 20..29, 30..39, 40..49, 50..59, 60..65].each do |interval|
+      books[interval].each do |book|
+        fork do
+          book_body = Nokogiri::HTML(open(@base_url + book))
+          chapters = book_body.css(".bible-nav .small ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
+          folder = book.split("/")[-2]
+          dirs = []
 
-      print folder + " " if dirs.empty?
+          chapters.each do |chapter|
+            chapter_body = Nokogiri::HTML(open(@base_url + chapter))
+            download_elem = chapter_body.css("audio > source[type='audio/mpeg']").first
 
-      dirs << download_elem["src"]
-      print "#"
+            dirs << download_elem["src"]
+            write.print "#"
+          end
 
-      next_elem = body.css(".next").first
-      next_url = @base_url + next_elem["href"]
-      next_folder = next_url.split("/")[-2]
-
-      unless next_folder == folder
-        filename = File.join(@urls_path, folder)
-
-        File.open(filename, "w") do |file|
-          file.puts dirs
+          filename = File.join(@urls_path, folder)
+          File.open(filename, "w") do |file|
+            file.puts dirs
+          end
         end
-
-        dirs = []
-        print "\n"
       end
+      Process.waitall
     end
   end
 
@@ -48,4 +47,4 @@ class Bible
 end
 
 Bible.create_download_files
-Bible.download_audios
+# Bible.download_audios
