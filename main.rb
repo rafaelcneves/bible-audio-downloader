@@ -26,7 +26,7 @@ class Bible
             download_elem = chapter_body.css("audio > source[type='audio/mpeg']").first
 
             dirs << download_elem["src"]
-            write.print "#"
+            print "#"
           end
 
           filename = File.join(@urls_path, folder)
