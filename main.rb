@@ -18,7 +18,7 @@ class Bible
         fork do
           book_body = Nokogiri::HTML(open(@base_url + book))
           chapters = book_body.css(".bible-nav .small ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
-          folder = book.split("/")[-2]
+          folder = book_body.css(".bible-nav .large .btn.dropdown-toggle").first.text
           dirs = []
 
           chapters.each do |chapter|
@@ -48,4 +48,4 @@ class Bible
 end
 
 Bible.create_download_files
-Bible.download_audios
+# Bible.download_audios
