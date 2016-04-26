@@ -16,7 +16,7 @@ class Bible
   @first_href = "/en-us/bible/online-bible/nvi-pt/genesis/1/"
   @urls_path = "urls"
 
-  def self.create_download_files
+  def self.download_all
     main_body = Nokogiri::HTML(open(@base_url + @first_href, proxy_http_basic_authentication: ["http://anoat.ht.lan:3128/", "rafael.neves", "ht@123AAA"]))
     books = main_body.css(".bible-nav .large ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
 
@@ -29,8 +29,23 @@ class Bible
           next unless folder
           progress = p.thread_variable_get(:progress)
           chapters = p.thread_variable_get(:chapters)
-          print "#{folder.truncate(12).ljust(13, " ")}"
-          print "| #{(("=" * (progress.to_f/chapters.to_f*50)) + ">").ljust(51, " ")} | #{progress}/#{chapters}" if progress
+          downloading = p.thread_variable_get(:downloading)
+          print folder.truncate(12).ljust(12, " ")
+          if progress
+            print " | "
+            unless downloading
+              progress_bar_size = progress.to_f / chapters.to_f * 50
+              progress_bar = ""
+              progress_bar += ">" unless progress_bar_size < 1
+              print progress_bar.
+                rjust(progress_bar_size, "=").
+                ljust(50, " ")
+            else
+              print "Downloading...".ljust(50, " ")
+            end
+            print " | "
+            print "#{progress}/#{chapters}"
+          end
           print "\n"
         end
         sleep 0.5
@@ -59,6 +74,9 @@ class Bible
         File.open(filename, "w") do |file|
           file.puts dirs
         end
+
+        Thread.current.thread_variable_set(:downloading, true)
+        `wget -q --directory-prefix='downloads/#{folder}' -i '#{filename}'`
       end
 
       begin
@@ -75,14 +93,6 @@ class Bible
     Thread.list.select {|thread| thread.status && thread.thread_variable_get(:book?) }
   end
 
-  def self.download_audios
-    Dir[File.join(@urls_path, "*")].each do |file|
-      puts file.split('/').last
-      `wget -q --directory-prefix='downloads/#{file.split('/').last}' -i #{file}`
-    end
-  end
-
 end
 
-Bible.create_download_files
-# Bible.download_audios
+Bible.download_all
