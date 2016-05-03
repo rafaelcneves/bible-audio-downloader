@@ -2,6 +2,7 @@
 
 require 'nokogiri'
 require 'open-uri'
+require 'id3_tags'
 
 class String
   def truncate length = 30, truncate_string = "..."
@@ -30,6 +31,7 @@ class Bible
           progress = p.thread_variable_get(:progress)
           chapters = p.thread_variable_get(:chapters)
           downloading = p.thread_variable_get(:downloading)
+          writing = p.thread_variable_get(:writing)
           print folder.truncate(12).ljust(12, " ")
           if progress
             print " | "
@@ -41,7 +43,11 @@ class Bible
                 rjust(progress_bar_size, "=").
                 ljust(50, " ")
             else
-              print "Downloading...".ljust(50, " ")
+              unless writing
+                print "Downloading...".ljust(50, " ")
+              else
+                print "Writing...".ljust(50, " ")
+              end
             end
             print " | "
             print "#{progress}/#{chapters}"
@@ -77,6 +83,19 @@ class Bible
 
         Thread.current.thread_variable_set(:downloading, true)
         `wget -q --directory-prefix='downloads/#{folder}' -i '#{filename}'`
+
+        Thread.current.thread_variable_set(:writing, true)
+        Dir["downloads/#{folder}/*"].each do |file|
+          chapter = file.split(".")[1]
+          tags = {
+            artist: "Bíblia",
+            album: folder,
+            title: "Capítulo #{chapter}"
+          }
+          Id3Tags.write_tags_to(file, tags)
+
+          File.rename(file, "downloads/#{folder}/#{folder} #{chapter}.mp3")
+        end
       end
 
       begin

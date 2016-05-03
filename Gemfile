@@ -3,3 +3,4 @@ source "https://rubygems.org"
 #ruby-gemset=bible_audio
 
 gem "nokogiri"
+gem 'id3_tags', '~> 0.1.0'
