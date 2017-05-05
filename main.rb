@@ -1,9 +1,14 @@
 #!/usr/bin/env ruby
 
+require 'i18n'
+require 'fileutils'
 require 'nokogiri'
 require 'open-uri'
 require 'id3_tags'
 require 'dotenv/load'
+require "curses"
+
+include Curses
 
 class String
   def truncate length = 30, truncate_string = "..."
@@ -17,47 +22,13 @@ class Bible
   @base_url = "http://www.biblica.com"
   @first_href = "/en-us/bible/online-bible/nvi-pt/genesis/1/"
   @urls_path = "urls"
+  @downloads_path = "downloads"
 
   def self.download_all
     main_body = Nokogiri::HTML(open_url(@base_url + @first_href))
     books = main_body.css(".bible-nav .large ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
 
-    progress_thread = Thread.new do
-      while true
-        break if Thread.current.thread_variable_get(:finish)
-        system "clear"
-        running_threads.each do |p|
-          folder = p.thread_variable_get(:folder)
-          next unless folder
-          progress = p.thread_variable_get(:progress)
-          chapters = p.thread_variable_get(:chapters)
-          downloading = p.thread_variable_get(:downloading)
-          writing = p.thread_variable_get(:writing)
-          print folder.truncate(12).ljust(12, " ")
-          if progress
-            print " | "
-            unless downloading
-              progress_bar_size = progress.to_f / chapters.to_f * 50
-              progress_bar = ""
-              progress_bar += ">" unless progress_bar_size < 1
-              print progress_bar.
-                rjust(progress_bar_size, "=").
-                ljust(50, " ")
-            else
-              unless writing
-                print "Downloading...".ljust(50, " ")
-              else
-                print "Writing...".ljust(50, " ")
-              end
-            end
-            print " | "
-            print "#{progress}/#{chapters}"
-          end
-          print "\n"
-        end
-        sleep 0.5
-      end
-    end
+    progress_thread = start_progress_thread
 
     books.each do |book|
       Thread.new do
@@ -65,29 +36,35 @@ class Bible
         book_body = Nokogiri::HTML(open_url(book))
         chapters = book_body.css(".bible-nav .small ul.dropdown-menu li>a").map{|i| i["href"]}
         folder = book_body.css(".bible-nav .large .btn.dropdown-toggle").first.text
-        Thread.current.thread_variable_set(:folder, folder)
+        Thread.current.thread_variable_set(:folder, I18n.transliterate(folder))
         Thread.current.thread_variable_set(:chapters, chapters.size)
         dirs = []
 
-        chapters.each do |chapter|
-          chapter_body = Nokogiri::HTML(open_url(chapter))
+        chapters.each.with_index do |chapter_url, index|
+          chapter_body = Nokogiri::HTML(open_url(chapter_url))
           download_elem = chapter_body.css("audio > source[type='audio/mpeg']").first
 
           dirs << download_elem["src"]
-          Thread.current.thread_variable_set(:progress, chapter.split('/').last)
+          Thread.current.thread_variable_set(:progress, index + 1)
         end
 
-        filename = File.join(@urls_path, folder)
-        File.open(filename, "w") do |file|
-          file.puts dirs
-        end
+        FileUtils.mkdir_p("#{@downloads_path}/#{folder}")
 
+        Thread.current.thread_variable_set(:progress, 0)
         Thread.current.thread_variable_set(:downloading, true)
-        `wget -q --directory-prefix='downloads/#{folder}' -i '#{filename}'`
+        dirs.each.with_index do |chapter_url, index|
+          chapter = chapter_url.split('/').last.split('.')[1]
+          File.open("#{@downloads_path}/#{folder}/#{folder} #{chapter}.mp3", "wb") do |f|
+            f << open_url(chapter_url).read
+          end
 
+          Thread.current.thread_variable_set(:progress, chapter.to_i)
+        end
+
+        Thread.current.thread_variable_set(:progress, 0)
         Thread.current.thread_variable_set(:writing, true)
-        Dir["downloads/#{folder}/*"].each do |file|
-          chapter = file.split(".")[1]
+        Dir["#{@downloads_path}/#{folder}/*"].each.with_index do |file, index|
+          chapter = file.gsub(".mp3", "").split(" ").last
           tags = {
             artist: "Bíblia",
             album: folder,
@@ -95,7 +72,7 @@ class Bible
           }
           Id3Tags.write_tags_to(file, tags)
 
-          File.rename(file, "downloads/#{folder}/#{folder} #{chapter}.mp3")
+          Thread.current.thread_variable_set(:progress, chapter)
         end
       end
 
@@ -107,6 +84,48 @@ class Bible
     running_threads.each(&:join)
     progress_thread.thread_variable_set(:finish, true)
     progress_thread.join
+  end
+
+  def self.start_progress_thread
+    Thread.new do
+      init_screen
+      win = Window.new(lines, cols, 0, 0)
+
+      while true
+        break if Thread.current.thread_variable_get(:finish)
+
+        running_threads.each do |p|
+          folder = p.thread_variable_get(:folder)
+          next unless folder
+          progress = p.thread_variable_get(:progress) || 0
+          downloading = p.thread_variable_get(:downloading)
+          writing = p.thread_variable_get(:writing)
+          chapters = p.thread_variable_get(:chapters)
+
+          line = folder.truncate(12).ljust(13, " ")
+          line += "|"
+          progress_bar_size = progress.to_f / chapters.to_f * 50
+          line += ("=" * progress_bar_size).ljust(50, " ")
+          line += "| #{progress}/#{chapters} "
+
+          if downloading
+            line += "Downloading..."
+          elsif writing
+            line += "Writing..."
+          else
+            line += "Indexing..."
+          end
+          line += "\n"
+          win.addstr line
+        end
+        win.refresh
+
+        sleep 0.5
+        win.clear
+      end
+      win.close
+      close_screen
+    end
   end
 
   def self.running_threads
