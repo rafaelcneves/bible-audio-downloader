@@ -3,6 +3,7 @@
 require 'nokogiri'
 require 'open-uri'
 require 'id3_tags'
+require 'dotenv/load'
 
 class String
   def truncate length = 30, truncate_string = "..."
@@ -18,7 +19,7 @@ class Bible
   @urls_path = "urls"
 
   def self.download_all
-    main_body = Nokogiri::HTML(open(@base_url + @first_href, proxy_http_basic_authentication: ["http://anoat.ht.lan:3128/", "rafael.neves", "ht@123AAA"]))
+    main_body = Nokogiri::HTML(open_url(@base_url + @first_href))
     books = main_body.css(".bible-nav .large ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
 
     progress_thread = Thread.new do
@@ -61,15 +62,15 @@ class Bible
     books.each do |book|
       Thread.new do
         Thread.current.thread_variable_set(:book?, true)
-        book_body = Nokogiri::HTML(open(@base_url + book, proxy_http_basic_authentication: ["http://anoat.ht.lan:3128/", "rafael.neves", "ht@123AAA"]))
-        chapters = book_body.css(".bible-nav .small ul.dropdown-menu li").map(&:children).flatten.map{|i| i["href"]}
+        book_body = Nokogiri::HTML(open_url(book))
+        chapters = book_body.css(".bible-nav .small ul.dropdown-menu li>a").map{|i| i["href"]}
         folder = book_body.css(".bible-nav .large .btn.dropdown-toggle").first.text
         Thread.current.thread_variable_set(:folder, folder)
         Thread.current.thread_variable_set(:chapters, chapters.size)
         dirs = []
 
         chapters.each do |chapter|
-          chapter_body = Nokogiri::HTML(open(@base_url + chapter, proxy_http_basic_authentication: ["http://anoat.ht.lan:3128/", "rafael.neves", "ht@123AAA"]))
+          chapter_body = Nokogiri::HTML(open_url(chapter))
           download_elem = chapter_body.css("audio > source[type='audio/mpeg']").first
 
           dirs << download_elem["src"]
@@ -110,6 +111,18 @@ class Bible
 
   def self.running_threads
     Thread.list.select {|thread| thread.status && thread.thread_variable_get(:book?) }
+  end
+
+  def self.open_url(url)
+    options = {}
+    if ENV['ENABLE_PROXY']
+      options[:proxy_http_basic_authentication] = [
+        ENV['PROXY_HOSTNAME'],
+        ENV['PROXY_USERNAME'],
+        ENV['PROXY_PASSWORD']
+      ]
+    end
+    open url, options
   end
 
 end
