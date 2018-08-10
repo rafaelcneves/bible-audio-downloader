@@ -16,10 +16,10 @@ GEM
       taglib-ruby
     json (1.8.3)
     mimemagic (0.3.1)
-    mini_portile2 (2.0.0)
+    mini_portile2 (2.3.0)
     minitest (5.8.4)
-    nokogiri (1.6.7.2)
-      mini_portile2 (~> 2.0.0.rc2)
+    nokogiri (1.8.4)
+      mini_portile2 (~> 2.3.0)
     taglib-ruby (0.7.1)
     thread_safe (0.3.5)
     tzinfo (1.2.2)
@@ -35,4 +35,4 @@ DEPENDENCIES
   nokogiri
 
 BUNDLED WITH
-   1.16.1
+   1.16.3
