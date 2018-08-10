@@ -19,8 +19,8 @@ class String
 end
 
 class Bible
-  @base_url = "http://www.biblica.com"
-  @first_href = "/en-us/bible/online-bible/nvi-pt/genesis/1/"
+  @base_url = "https://www.biblica.com"
+  @first_href = "/bible/nvi-pt/genesis/1/"
   @urls_path = "urls"
   @downloads_path = "downloads"
 
